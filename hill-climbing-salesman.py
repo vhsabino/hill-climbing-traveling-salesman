@@ -10,11 +10,11 @@ import random
 import time
 
 iterations = 10
-branch_factor = 38
-swaps = 1
+branch_factor = 194
+swaps = 2
 
-filePath = "./dj38.tsp"
-result_file = open("./results/"+ filePath[:-4] + "_rand_" + (("swap_" + str(swaps)) if swaps >= 0 else "shuffle") + "_" + str(branch_factor) + "_x_" +  str(iterations) + ".txt",'w')
+filePath = "./qa194.tsp"#"./dj38.tsp"
+result_file = open("./results/"+ filePath[:-4] + "swaps_2_results.txt",'w')
 
 class Solution:
     def __init__(self, num):
@@ -31,21 +31,12 @@ class Solution:
     def get(self):
         return self.solution, self.value, self.iterations
 
-def f_n(nodes, cities, n_nodes):
+def evaluation_function(nodes, cities, n_nodes):
 	dist = 0
 	for i in range(n_nodes-1):
 		edge = nodes[i], nodes[i+1]
 		dist += cities.get_weight(*edge) # euclidean distance
 	return dist
-
-def swap_random(nodes, cities, n_nodes, i):
-	temp_nodes = nodes.copy()
-	swap_place = random.randint(int((i - 1) * (n_nodes / branch_factor)), int(i * (n_nodes / branch_factor) - 1))
-	if swap_place == 0:
-		return ([], float('inf'))
-	temp_nodes[0], temp_nodes[swap_place] = temp_nodes[swap_place], temp_nodes[0]
-	temp_value = f_n(temp_nodes, cities, n_nodes)
-	return (temp_nodes, temp_value)
 
 def swap_n_random(nodes, cities, n_nodes, i):
 	temp_nodes = nodes.copy()
@@ -57,42 +48,17 @@ def swap_n_random(nodes, cities, n_nodes, i):
 		if len(random_idx) < 4:
 			random_idx = list(range(n_nodes))
 			random.shuffle(random_idx)
-	temp_value = f_n(temp_nodes, cities, n_nodes)
-	return (temp_nodes, temp_value)
-
-def shuffle_random(nodes, cities, n_nodes, i):
-	temp_nodes = nodes.copy()
-	random.shuffle(temp_nodes)
-	temp_value = f_n(temp_nodes, cities, n_nodes)
+	temp_value = evaluation_function(temp_nodes, cities, n_nodes)
 	return (temp_nodes, temp_value)
 
 def operate(nodes, cities, n_nodes):
     b_nodes = []
-    b_value = 0
-    function = None
-    #if swaps == 0:
-    #    function = swap_random
-    #elif swaps > 0:
-    #    function = swap_n_random
-    #else:
-    #    function = shuffle_random
-    childrens = Parallel(n_jobs=8)(delayed(swap_n_random)(nodes, cities, n_nodes, i+1) for i in range(branch_factor))
-    print(childrens)
-    for c, v in childrens:
-        # Best child remain
-        if(b_value == 0 or v < b_value):
-            b_nodes = c
-            b_value = v
-    return b_nodes, b_value
-
-def operate2(nodes, cities, n_nodes):
-    b_nodes = []
+    childrens = []
     b_value = 0
     for i in range(branch_factor):
-        childrens = swap_n_random(nodes, cities, n_nodes, i+1)
-    print(childrens)
+        childrens.append(swap_n_random(nodes, cities, n_nodes, i+1))
     for c, v in childrens:
-        if(b_value == 0 or v < b_value): #best child remain
+        if(b_value == 0 or v < b_value): #keep only the best
             b_nodes = c
             b_value = v
     return b_nodes, b_value
@@ -107,23 +73,40 @@ def main():
     for i in range(iterations):
         nodes = list(range(1, n_nodes + 1))
         random.shuffle(nodes) #sort all nodes randomly
-        value = f_n(nodes, cities, n_nodes)
+        value = evaluation_function(nodes, cities, n_nodes)
 
         step = 0
         result = Solution(i)
-        result_file.write("###########   Round: " + str(i+1) + "   ###########\n")
+        result_file.write("\t==============  Round: " + str(i+1) + "   ==============\n")
         start_t = time.time()
         iterations_t = []
         while(True):
             step += 1
             # Operate -> Find best children
             child_nodes, child_value = operate(nodes, cities, n_nodes)
-            #print(child_nodes, child_value)
-            child_nodes2, child_value2 = operate2(nodes, cities, n_nodes)
-            #print(child_nodes2, child_value2)
-            if step > 10:
+            result_file.write("\t==== "+ str(step) + " iteration -> f(n): " + str(value) + "\n")# Success reduces distance value?
+            if child_value <= value and step <= 300:
+                value = child_value
+                nodes = child_nodes
+            else:
+                result.set(nodes, value, step)
+                solutions.append(result)
+                result_file.write("\n\t====   Best Solution -> " + str(step) + " iterations: f(n): " + str(value))
+                result_file.write("\n\t====    - Elapsed time: " + str(sum(iterations_t)) + " |  time / iterations: " + str(sum(iterations_t)/step) + "\n\n\n")
+                if best_round_value[0] == 0 or value < best_round_value[0]:
+                    best_round_value = (value, i+1)
+                    with open(result_file.name[:-4] + "_nodes.txt",'w',encoding = 'utf-8') as f:
+                        f.write("\t=====  Best Solution found, in round: " + str(i+1) + "  -> f(n): " + str(best_round_value[0]) + "   ######\n")
+                        f.write("\t=====      - Elapsed time: " + str(sum(iterations_t)) + " |  time / iterations: " + str(sum(iterations_t)/step) + "\n")
+                        f.write("Order to visit cities: ")
+                        for n in nodes:
+                            f.write(str(n) + ", ")
+                    if i == step-1:
+                        result_file.write("Best Solution: " + str(best_round_value[1]) + " round -> f(n): " + str(best_round_value[0]))
                 break
-
+            iterations_t.append(time.time() - start_t)
+            start_t = time.time()
+    result_file.close()
 
 if __name__ == "__main__":
     main()
