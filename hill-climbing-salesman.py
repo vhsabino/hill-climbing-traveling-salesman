@@ -1,20 +1,18 @@
 # ACA 
-# Using librar tsplib95
+# Using library tsplib95
 # Documentation https://tsplib95.readthedocs.io/en/stable/pages/usage.html
 # 
 
-
-from joblib import Parallel, delayed
 import tsplib95
 import random
 import time
 
 iterations = 10
-branch_factor = 194
-swaps = 2
+branch_factor = 38
+swaps = 1
 
-filePath = "./qa194.tsp"#"./dj38.tsp"
-result_file = open("./results/"+ filePath[:-4] + "swaps_2_results.txt",'w')
+filePath = "./dj38.tsp"
+result_file = open("./results/"+ filePath[:-4] + "swaps_1_results.txt",'w')
 
 class Solution:
     def __init__(self, num):
@@ -38,7 +36,8 @@ def evaluation_function(nodes, cities, n_nodes):
 		dist += cities.get_weight(*edge) # euclidean distance
 	return dist
 
-def swap_n_random(nodes, cities, n_nodes, i):
+#Swaps n random cities and calculates its distance
+def swap_n_random(nodes, cities, n_nodes, i): 
 	temp_nodes = nodes.copy()
 	random_idx = list(range(n_nodes))
 	random.shuffle(random_idx)
@@ -72,7 +71,7 @@ def main():
 
     for i in range(iterations):
         nodes = list(range(1, n_nodes + 1))
-        random.shuffle(nodes) #sort all nodes randomly
+        random.shuffle(nodes) #initial configuration|: sort all nodes randomly
         value = evaluation_function(nodes, cities, n_nodes)
 
         step = 0
@@ -82,20 +81,19 @@ def main():
         iterations_t = []
         while(True):
             step += 1
-            # Operate -> Find best children
             child_nodes, child_value = operate(nodes, cities, n_nodes)
-            result_file.write("\t==== "+ str(step) + " iteration -> f(n): " + str(value) + "\n")# Success reduces distance value?
+            result_file.write("\t==== "+ str(step) + " iteration -> f(n): " + str(value) + "\n")
             if child_value <= value and step <= 300:
                 value = child_value
                 nodes = child_nodes
             else:
                 result.set(nodes, value, step)
-                solutions.append(result)
+                solutions.append(result) #print best results in file
                 result_file.write("\n\t====   Best Solution -> " + str(step) + " iterations: f(n): " + str(value))
                 result_file.write("\n\t====    - Elapsed time: " + str(sum(iterations_t)) + " |  time / iterations: " + str(sum(iterations_t)/step) + "\n\n\n")
                 if best_round_value[0] == 0 or value < best_round_value[0]:
                     best_round_value = (value, i+1)
-                    with open(result_file.name[:-4] + "_nodes.txt",'w',encoding = 'utf-8') as f:
+                    with open(result_file.name[:-4] + "_nodes.txt",'w',encoding = 'utf-8') as f: #print final node
                         f.write("\t=====  Best Solution found, in round: " + str(i+1) + "  -> f(n): " + str(best_round_value[0]) + "   ######\n")
                         f.write("\t=====      - Elapsed time: " + str(sum(iterations_t)) + " |  time / iterations: " + str(sum(iterations_t)/step) + "\n")
                         f.write("Order to visit cities: ")
